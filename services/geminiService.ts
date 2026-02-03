@@ -8,13 +8,13 @@ SEU OBJETIVO:
 Criar um texto ÚNICO e PRONTO para copiar e colar para cada produto identificado.
 
 ⚠️ ATENÇÃO CRÍTICA - DETECÇÃO DE LINK NA IMAGEM (OCR):
-1. O usuário pode enviar um print da tela de afiliados (ex: Mercado Livre, Amazon) que contém o LINK CURTO (Link de divulgação).
-2. Analise a imagem procurando por URLs como:
-   - "mercadolivre.com/sec/..."
+1. O usuário enviará prints da tela de afiliados com campos como "Link do produto" ou "ID do produto".
+2. O LINK PARAMETRIZADO (prioridade máxima) geralmente está no campo "Link do produto". Procure por:
+   - "mercadolivre.com/sec/..." (Dê prioridade absoluta se estiver em um modal/campo de link).
    - "amzn.to/..."
    - "shope.ee/..."
    - "magazineluiza.com.br/..."
-3. SE ENCONTRAR UM LINK NA IMAGEM: Use-o como o link oficial da oferta. Ele tem prioridade sobre links de texto colados.
+3. SE ENCONTRAR UM LINK CURTO (/sec/, amzn.to, etc): Use-o como o link oficial. Ele tem prioridade TOTAL sobre links longos ou de texto colado.
 
 ⚠️ ATENÇÃO CRÍTICA - DETECÇÃO DE CUPONS:
 1. Analise a imagem e texto em busca de códigos promocionais ("CUPOM", "CÓDIGO", "USE:", "CODE:").
@@ -61,7 +61,7 @@ REGRAS DE PREÇO (FORMATAÇÃO WHATSAPP):
 REGRAS GERAIS:
 - Remova rótulos "Produto:" e "Preço:".
 - Não invente dados.
-- Link: Se achou na imagem (ex: mercadolivre.com/sec/...), USE ELE. Se não, use o do input.
+- Link: Se achou na imagem curto (/sec/), USE ELE.
 - Use português do Brasil persuasivo.
 `;
 
@@ -90,7 +90,7 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
   ${links.map((link, i) => `${i + 1}. ${link}`).join('\n')}
 
   INSTRUÇÃO:
-  Analise as imagens e os links. Se a imagem contiver um link de afiliado explícito (ex: mercadolivre.com/sec/...), DÊ PRIORIDADE a ele.
+  Analise as imagens e os links. Se a imagem contiver um link de afiliado explícito curto (ex: mercadolivre.com/sec/...), DÊ PRIORIDADE TOTAL a ele.
   `;
 
   const parts: any[] = [{ text: promptText }];
