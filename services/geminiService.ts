@@ -107,7 +107,7 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-1.5-flash',
       contents: { parts: parts },
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
