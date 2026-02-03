@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GeneratedCopy } from '../../types';
+import { GeneratedCopy } from '../types';
 import CopyButton from './CopyButton';
 import { Smartphone, Home, Sparkles, Shirt, Coffee, Flame, HelpCircle, ExternalLink } from 'lucide-react';
 

@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { GeneratedCopy } from "../../types";
+import { GeneratedCopy } from "../types";
 
 const SYSTEM_INSTRUCTION = `
 Você é um gerador automático de textos promocionais para WhatsApp focado em vendas como afiliado.

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GeneratedCopy } from '../../types';
+import { GeneratedCopy } from '../types';
 import ResultCard from './ResultCard';
 import { Search, ShoppingBag, ShoppingCart, Truck, Store, Package, Grid, Trash2 } from 'lucide-react';
 
@@ -100,8 +100,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory, onDe
                   key={p.id}
                   onClick={() => setFilterPlatform(p.id)}
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${filterPlatform === p.id
-                      ? 'bg-slate-800 text-white shadow-md'
-                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+                    ? 'bg-slate-800 text-white shadow-md'
+                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
                     }`}
                 >
                   {p.icon}
