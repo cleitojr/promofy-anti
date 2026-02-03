@@ -110,8 +110,7 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
       model: 'gemini-1.5-flash',
       contents: { parts: parts },
       config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        tools: [{ googleSearch: {} }],
+        systemInstruction: SYSTEM_INSTRUCTION + "\n\nCRITICAL: You MUST return a JSON array of objects. Even if you only find one product, return it inside an array [{}]. If you find multiple, return all. NEVER return an empty array if an image or link is provided.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -124,7 +123,7 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
               },
               productImageUrl: {
                 type: Type.STRING,
-                description: "URL direta da imagem do produto (formato jpg/png) encontrada na busca. Priorize imagens de fundo branco."
+                description: "URL direta da imagem do produto (formato jpg/png) se encontrada."
               },
               category: {
                 type: Type.STRING,
@@ -142,9 +141,26 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
     });
 
     let cleanJson = response.text || "[]";
+    // Basic cleaning in case of markdown blocks
     cleanJson = cleanJson.replace(/```json/g, '').replace(/```/g, '').trim();
 
-    const output = JSON.parse(cleanJson);
+    let output = [];
+    try {
+      output = JSON.parse(cleanJson);
+    } catch (e) {
+      console.error("JSON Parse Error:", cleanJson);
+      throw new Error("Falha ao processar resposta da IA.");
+    }
+
+    if (!Array.isArray(output) || output.length === 0) {
+      // Fallback result if AI returns empty or invalid structure
+      output = [{
+        originalLink: links[0] || "Link na imagem",
+        text: "IA analisou o pedido mas não conseguiu estruturar a copy. Por favor, tente enviar um print mais claro ou cole o link do produto.",
+        category: "OTHER",
+        productImageUrl: undefined
+      }];
+    }
 
     return output.map((item: any, index: number) => {
       // Improved Image Mapping Logic:
