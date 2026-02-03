@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { generateAffiliateText } from './services/geminiService';
-import { GeneratedCopy, AppStatus } from '../types';
+import { GeneratedCopy, AppStatus } from './types';
 import ResultCard from './components/ResultCard';
 import HistoryView from './components/HistoryView';
 import {
@@ -8,6 +8,8 @@ import {
   ImageIcon, X, Plus, History, LayoutGrid,
   ArrowLeft, CheckCircle2
 } from 'lucide-react';
+
+import { supabase } from './services/supabase';
 
 type ViewState = 'input' | 'loading' | 'results' | 'history';
 
@@ -29,18 +31,49 @@ const App: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load History from LocalStorage on mount
+  // Load History from Supabase/LocalStorage on mount
   useEffect(() => {
-    const savedHistory = localStorage.getItem('affilizap_history');
-    if (savedHistory) {
-      try {
-        setHistory(JSON.parse(savedHistory));
-      } catch (e) {
-        console.error("Failed to parse history", e);
-        // If history is corrupted, clear it to prevent crash loops
-        localStorage.removeItem('affilizap_history');
+    const loadHistory = async () => {
+      // First try local storage for immediate UI
+      const savedHistory = localStorage.getItem('affilizap_history');
+      if (savedHistory) {
+        try {
+          setHistory(JSON.parse(savedHistory));
+        } catch (e) {
+          console.error("Failed to parse history", e);
+        }
       }
-    }
+
+      // Then try Supabase if available
+      try {
+        const { data, error } = await supabase
+          .from('link_history')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (data && !error) {
+          // Merge or replace? Let's replace for now to keep it clean
+          const supabaseHistory: GeneratedCopy[] = data.map(item => ({
+            id: item.id,
+            originalLink: item.original_url,
+            text: item.text || item.generated_url, // fallback
+            platform: item.platform as any,
+            category: 'OTHER', // Default or fetch if stored
+            timestamp: new Date(item.created_at).getTime(),
+            isError: item.status === 'error'
+          }));
+
+          if (supabaseHistory.length > 0) {
+            setHistory(supabaseHistory);
+          }
+        }
+      } catch (e) {
+        console.error("Supabase load error", e);
+      }
+    };
+
+    loadHistory();
   }, []);
 
   // Save History to LocalStorage whenever it changes
@@ -162,6 +195,20 @@ const App: React.FC = () => {
         const validResults = generatedData.filter(d => !d.isError);
         if (validResults.length > 0) {
           setHistory(prev => [...validResults, ...prev]);
+
+          // Save to Supabase
+          validResults.forEach(async (res) => {
+            try {
+              await supabase.from('link_history').insert({
+                original_url: res.originalLink,
+                generated_url: res.text,
+                platform: res.platform,
+                status: 'success'
+              });
+            } catch (e) {
+              console.error("Failed to save to Supabase", e);
+            }
+          });
         }
 
         // Auto-clear inputs
