@@ -55,12 +55,18 @@ const detectPlatform = (link: string): GeneratedCopy['platform'] => {
   return 'OTHER';
 };
 
+const getMimeType = (base64String: string): string => {
+  const match = base64String.match(/^data:([^;]+);/);
+  return match ? match[1] : 'image/jpeg';
+};
+
 export const generateAffiliateText = async (links: string[], images: string[] = []): Promise<GeneratedCopy[]> => {
-  if (!process.env.API_KEY) {
-    throw new Error("API Key is missing. Please set process.env.API_KEY.");
+  if (!process.env.API_KEY && !process.env.GEMINI_API_KEY) {
+    throw new Error("API Key is missing.");
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || "";
+  const ai = new GoogleGenAI({ apiKey });
 
   const promptText = `
   INPUTS DO USUÁRIO:
@@ -75,10 +81,11 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
   const parts: any[] = [{ text: promptText }];
 
   images.forEach((base64String) => {
+    const mimeType = getMimeType(base64String);
     const base64Data = base64String.split(',')[1] || base64String;
     parts.push({
       inlineData: {
-        mimeType: 'image/jpeg',
+        mimeType: mimeType,
         data: base64Data
       }
     });
@@ -126,8 +133,8 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
 
     if (!Array.isArray(output) || output.length === 0) {
       output = [{
-        originalLink: links[0] || "Link na imagem",
-        text: "IA não conseguiu estruturar a copy. Tente um print mais claro.",
+        originalLink: links[0] || "No link",
+        text: "IA não conseguiu estruturar a copy automaticamente. Certifique-se de que o print mostra o nome e preço do produto claramente.",
         category: "OTHER"
       }];
     }
@@ -136,7 +143,7 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
       let assignedImage = undefined;
       if (images[index]) {
         assignedImage = images[index];
-      } else if (images.length === 1 && output.length > 1) {
+      } else if (images.length === 1) {
         assignedImage = images[0];
       }
 
@@ -154,14 +161,16 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
 
   } catch (error) {
     console.error("Gemini Generation Error:", error);
-    return links.map((link, index) => ({
-      id: `err-${index}`,
-      originalLink: link,
-      text: "Erro ao gerar copy. Tente novamente.",
+    // Return a visible error card instead of an empty list
+    return [{
+      id: `err-${Date.now()}`,
+      originalLink: links[0] || "",
+      text: "Lamento, não consegui processar esse pedido agora. Verifique sua conexão ou tente enviar um print mais nítido.",
       category: 'OTHER',
-      platform: detectPlatform(link),
+      platform: detectPlatform(links[0] || ""),
       timestamp: Date.now(),
-      isError: true
-    }));
+      isError: true,
+      imageUrl: images[0]
+    }];
   }
 };
