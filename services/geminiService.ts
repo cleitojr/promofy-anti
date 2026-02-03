@@ -5,7 +5,7 @@ const SYSTEM_INSTRUCTION = `
 Você é um gerador automático de textos promocionais para WhatsApp focado em vendas como afiliado.
 
 SEU OBJETIVO:
-Criar um texto ÚNICO e PRONTO para copiar e colar para cada produto identificado.
+Criar um texto ÚNICO e PRONTO para copiar e colar para cada produto identificado, seguindo estritamente o modelo de copy do usuário.
 
 ⚠️ ATENÇÃO CRÍTICA - DETECÇÃO DE LINK NA IMAGEM (OCR):
 1. O usuário enviará prints da tela de afiliados com campos como "Link do produto" ou "ID do produto".
@@ -18,51 +18,29 @@ Criar um texto ÚNICO e PRONTO para copiar e colar para cada produto identificad
 
 ⚠️ ATENÇÃO CRÍTICA - DETECÇÃO DE CUPONS:
 1. Analise a imagem e texto em busca de códigos promocionais ("CUPOM", "CÓDIGO", "USE:", "CODE:").
-2. Se encontrar, é OBRIGATÓRIO incluir.
+2. Se encontrar, é OBRIGATÓRIO incluir na copy acima do link.
 
-⚠️ ATENÇÃO CRÍTICA - BUSCA DE IMAGEM LIMPA:
-1. Além de gerar o texto, utilize a ferramenta de busca para encontrar uma URL de imagem PÚBLICA e de ALTA QUALIDADE deste produto específico.
-2. Priorize imagens com fundo branco ou fundo limpo, estilo e-commerce.
+🧱 ESTRUTURA OBRIGATÓRIA DA COPY (Siga este exemplo exato):
 
-🎭 ESTILOS E EMOJIS (Identifique o produto e aplique):
-
-1. Eletrônicos / Tecnologia: ⚡📱💻🔥🎧
-2. Casa, limpeza, organização: 🏠🧼✨🛠️🍳
-3. Beleza, saúde, autocuidado: 💄🧴💆‍♀️✨💅
-4. Moda e acessórios: 👕👟👜🔥🕶️
-5. Alimentos, suplementos: 🍫☕🥤😋🍎
-6. Outros/Virais: 😂🤯🔥🚀
-
-🧱 ESTRUTURA OBRIGATÓRIA DO TEXTO (Siga estritamente):
-
-🔥 [TÍTULO CHAMATIVO E CURTO]
+🔥 [TÍTULO SUTIL E CRIATIVO SOBRE O TEMA COM EMOJI]
 
 [Nome Comercial do Produto]
-(NÃO escreva "Produto:", apenas o nome)
 
-💰 [Valor]
-REGRAS DE PREÇO (FORMATAÇÃO WHATSAPP):
-- Preço normal: "R$ 99,90"
-- Promoção (De/Por): "De ~R$ 150,00~ por R$ 99,90 (33% OFF)"
--> OBRIGATÓRIO: Use o til (~) no começo e fim do preço antigo para riscá-lo.
--> OBRIGATÓRIO: Calcule e exiba a porcentagem de desconto.
-
-[SE UM CUPOM FOI DETECTADO, INSIRA AQUI:]
-🎟️ Cupom: [CÓDIGO]
+💰 De ~[Preço_Antigo]~ por [Preço_Atual] ([X]% OFF)
+(Use til ~ para riscar o preço antigo. Se não houver preço antigo, coloque apenas o valor atual).
 
 💳 [Parcelamento]
-(Exiba APENAS se for "sem juros" ou relevante. Se não achar, omita).
+(Exiba apenas se houver no print, ex: 6x R$ 17,50 sem juros).
 
-🔗 Link: [LINK_DETECTADO_NA_IMAGEM_OU_TEXTO]
+🔗 Link: [LINK_DETECTADO_NA_IMAGEM]
 
-⚠️ _Atenção: preço pode variar conforme estoque e disponibilidade._
-(OBRIGATÓRIO: Use underscore (_) para deixar esta frase em itálico).
+_Atenção: preço pode variar conforme estoque e disponibilidade._
+(Use underscores _ para o itálico).
 
 REGRAS GERAIS:
-- Remova rótulos "Produto:" e "Preço:".
-- Não invente dados.
-- Link: Se achou na imagem curto (/sec/), USE ELE.
-- Use português do Brasil persuasivo.
+- Não use rótulos como "Título:" ou "Produto:". Siga o espaçamento do exemplo.
+- Use português do Brasil persuasivo e natural.
+- Identifique o produto com precisão através do OCR da imagem.
 `;
 
 const detectPlatform = (link: string): GeneratedCopy['platform'] => {
@@ -86,11 +64,12 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
 
   const promptText = `
   INPUTS DO USUÁRIO:
-  LINKS DE TEXTO (Opcional se houver link na imagem):
+  LINKS DE TEXTO:
   ${links.map((link, i) => `${i + 1}. ${link}`).join('\n')}
 
   INSTRUÇÃO:
-  Analise as imagens e os links. Se a imagem contiver um link de afiliado explícito curto (ex: mercadolivre.com/sec/...), DÊ PRIORIDADE TOTAL a ele.
+  Analise a imagem para extrair o Nome do Produto, Preço (De/Por), Parcelamento e o Link do Produto (especialmente links /sec/).
+  Gere a copy seguindo EXATAMENTE o modelo de estrutura fornecido no System Instruction.
   `;
 
   const parts: any[] = [{ text: promptText }];
@@ -110,7 +89,7 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
       model: 'gemini-1.5-flash',
       contents: { parts: parts },
       config: {
-        systemInstruction: SYSTEM_INSTRUCTION + "\n\nCRITICAL: You MUST return a JSON array of objects. Even if you only find one product, return it inside an array [{}]. If you find multiple, return all. NEVER return an empty array if an image or link is provided.",
+        systemInstruction: SYSTEM_INSTRUCTION + "\n\nCRITICAL: Return a JSON array. Each object must have 'originalLink', 'text', 'category'.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -118,20 +97,14 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
             type: Type.OBJECT,
             properties: {
               originalLink: {
-                type: Type.STRING,
-                description: "O link final usado na oferta."
-              },
-              productImageUrl: {
-                type: Type.STRING,
-                description: "URL direta da imagem do produto (formato jpg/png) se encontrada."
+                type: Type.STRING
               },
               category: {
                 type: Type.STRING,
                 enum: ['TECH', 'HOME', 'BEAUTY', 'FASHION', 'FOOD', 'VIRAL', 'OTHER']
               },
               text: {
-                type: Type.STRING,
-                description: "O texto promocional completo."
+                type: Type.STRING
               }
             },
             required: ["originalLink", "text", "category"]
@@ -141,7 +114,6 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
     });
 
     let cleanJson = response.text || "[]";
-    // Basic cleaning in case of markdown blocks
     cleanJson = cleanJson.replace(/```json/g, '').replace(/```/g, '').trim();
 
     let output = [];
@@ -153,19 +125,15 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
     }
 
     if (!Array.isArray(output) || output.length === 0) {
-      // Fallback result if AI returns empty or invalid structure
       output = [{
         originalLink: links[0] || "Link na imagem",
-        text: "IA analisou o pedido mas não conseguiu estruturar a copy. Por favor, tente enviar um print mais claro ou cole o link do produto.",
-        category: "OTHER",
-        productImageUrl: undefined
+        text: "IA não conseguiu estruturar a copy. Tente um print mais claro.",
+        category: "OTHER"
       }];
     }
 
     return output.map((item: any, index: number) => {
-      // Improved Image Mapping Logic:
       let assignedImage = undefined;
-
       if (images[index]) {
         assignedImage = images[index];
       } else if (images.length === 1 && output.length > 1) {
@@ -178,8 +146,7 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
         text: item.text || "",
         category: item.category,
         platform: detectPlatform(item.originalLink || links[index] || ""),
-        imageUrl: assignedImage, // The original print/screenshot
-        productImageUrl: item.productImageUrl, // The new clean image from search
+        imageUrl: assignedImage,
         timestamp: Date.now(),
         isError: false
       };
@@ -190,7 +157,7 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
     return links.map((link, index) => ({
       id: `err-${index}`,
       originalLink: link,
-      text: "Erro ao gerar copy. Tente novamente ou verifique se o link é válido.",
+      text: "Erro ao gerar copy. Tente novamente.",
       category: 'OTHER',
       platform: detectPlatform(link),
       timestamp: Date.now(),
