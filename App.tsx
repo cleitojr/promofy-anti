@@ -6,14 +6,17 @@ import HistoryView from './components/HistoryView';
 import {
   Wand2, AlertCircle, Trash2, MessageSquare,
   ImageIcon, X, Plus, History, LayoutGrid,
-  ArrowLeft, CheckCircle2
+  ArrowLeft, CheckCircle2, Loader2
 } from 'lucide-react';
 
 import { supabase } from './services/supabase';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import AuthScreen from './components/AuthScreen';
 
 type ViewState = 'input' | 'loading' | 'results' | 'history';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { user, loading: authLoading, signOut } = useAuth();
   // Navigation State
   const [currentView, setCurrentView] = useState<ViewState>('input');
 
@@ -259,7 +262,7 @@ const App: React.FC = () => {
           <div className="bg-gradient-to-tr from-green-600 to-emerald-500 text-white p-2 rounded-lg shadow-lg shadow-green-500/20">
             <MessageSquare size={20} fill="currentColor" />
           </div>
-          <div>
+          <div className="hidden sm:block">
             <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-tight">AffiliZap Gen</h1>
             <span className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">AI Copywriter</span>
           </div>
@@ -268,28 +271,57 @@ const App: React.FC = () => {
         <nav className="flex items-center bg-slate-100/50 p-1 rounded-xl border border-slate-200/60">
           <button
             onClick={() => setCurrentView('input')}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${currentView === 'input' || currentView === 'loading' || currentView === 'results'
+            className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${currentView === 'input' || currentView === 'loading' || currentView === 'results'
               ? 'bg-white text-green-700 shadow-sm border border-slate-100'
               : 'text-slate-500 hover:text-slate-700'
               }`}
           >
             <LayoutGrid size={14} />
-            Gerador
+            <span className="hidden xs:inline">Gerador</span>
           </button>
           <button
             onClick={() => setCurrentView('history')}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${currentView === 'history'
+            className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${currentView === 'history'
               ? 'bg-white text-green-700 shadow-sm border border-slate-100'
               : 'text-slate-500 hover:text-slate-700'
               }`}
           >
             <History size={14} />
-            Histórico
+            <span className="hidden xs:inline">Histórico</span>
           </button>
         </nav>
+
+        <div className="flex items-center gap-3">
+          <div className="flex flex-col items-end hidden md:flex">
+            <span className="text-[11px] font-bold text-slate-900 leading-none">{user?.user_metadata?.full_name || user?.email?.split('@')[0]}</span>
+            <span className="text-[9px] font-medium text-slate-400 uppercase tracking-tighter">Premium User</span>
+          </div>
+          <button
+            onClick={signOut}
+            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+            title="Sair"
+          >
+            <ArrowLeft size={18} />
+          </button>
+        </div>
       </div>
     </header>
   );
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 size={32} className="text-green-600 animate-spin" />
+          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreen />;
+  }
 
   const renderInputView = () => (
     <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -467,6 +499,14 @@ const App: React.FC = () => {
         {currentView === 'results' && renderResultsView()}
       </main>
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 };
 
