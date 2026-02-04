@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { createGoogleGenerativeAI, Type } from "@google/genai";
 import { GeneratedCopy } from "../types";
 
 const SYSTEM_INSTRUCTION = `
@@ -75,25 +75,22 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
     throw new Error("API Key is missing.");
   }
 
-  console.log("Starting Gemini Generation with:", { linksCount: links.length, imagesCount: images.length });
+  console.log("Starting Gemini Generation with SDK v1 (Deepmind SDK)");
 
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = createGoogleGenerativeAI({ apiKey });
 
   const promptText = `
   INPUTS DO USUÁRIO:
   ${links.length > 0 ? `LINKS DE TEXTO:\n${links.map((link, i) => `${i + 1}. ${link}`).join('\n')}` : 'Nenhum link colado, observe apenas a imagem.'}
-
-  Gere a copy seguindo EXATAMENTE o modelo de estrutura fornecido.
   `;
 
+  // Construction for @google/genai SDK
   const parts: any[] = [{ text: promptText }];
 
   images.forEach((base64String, idx) => {
     try {
       const mimeType = getMimeType(base64String);
       const base64Data = base64String.split(',')[1] || base64String;
-
-      console.log(`Processing image ${idx}:`, { mimeType, dataLength: base64Data.length });
 
       parts.push({
         inlineData: {
@@ -107,12 +104,11 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
   });
 
   try {
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    // Use generateContent with standard SDK methods for better compatibility
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts }],
-      generationConfig: {
+    const response = await ai.models.generateContent({
+      model: "gemini-1.5-flash",
+      contents: parts,
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -127,29 +123,26 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
             required: ["originalLink", "text", "category"]
           }
         }
-      },
-      systemInstruction: SYSTEM_INSTRUCTION
+      }
     });
 
-    const response = await result.response;
-    let cleanJson = response.text() || "[]";
-    console.log("Raw AI Response:", cleanJson);
+    const responseText = response.text || "[]";
+    console.log("Raw AI Response:", responseText);
 
-    // Extra cleaning just in case the model ignores the "no blocks" instruction
-    cleanJson = cleanJson.replace(/```json/g, '').replace(/```/g, '').trim();
+    let cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
 
     let output = [];
     try {
       output = JSON.parse(cleanJson);
     } catch (e) {
       console.error("JSON Parse Error:", cleanJson);
-      throw new Error("Falha ao organizar resposta da IA.");
+      throw new Error("Fallha ao processar o JSON da IA.");
     }
 
     if (!Array.isArray(output) || output.length === 0) {
       output = [{
         originalLink: links[0] || "",
-        text: "IA analisou mas não gerou o formato JSON esperado. Tente novamente.",
+        text: "IA analisou mas não gerou o formato esperado. Tente novamente.",
         category: "OTHER"
       }];
     }
@@ -180,7 +173,7 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
     return [{
       id: `err-${Date.now()}`,
       originalLink: links[0] || "",
-      text: `Erro técnico: ${error.message || "Falha na geração"}. Verifique o console ou a chave da API.`,
+      text: `Erro técnico: ${error.message || "Falha na geração"}. Verifique se a chave API é válida.`,
       category: 'OTHER',
       platform: detectPlatform(links[0] || ""),
       timestamp: Date.now(),
