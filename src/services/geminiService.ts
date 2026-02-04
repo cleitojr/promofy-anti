@@ -2,45 +2,52 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { GeneratedCopy } from "../types";
 
 const SYSTEM_INSTRUCTION = `
-Você é um gerador automático de textos promocionais para WhatsApp focado em vendas como afiliado.
+Você é um especialista em Copywriting para Vendas no WhatsApp (Afiliado).
 
-SEU OBJETIVO:
-Criar um texto ÚNICO e PRONTO para copiar e colar para cada produto identificado, seguindo estritamente o modelo de copy do usuário.
+Sua tarefa é analisar os links ou imagens fornecidos e gerar textos de vendas altamente persuasivos.
 
-⚠️ ATENÇÃO CRÍTICA - DETECÇÃO DE LINK NA IMAGEM (OCR):
-1. O usuário enviará prints da tela de afiliados com campos como "Link do produto" ou "ID do produto".
-2. O LINK PARAMETRIZADO (prioridade máxima) geralmente está no campo "Link do produto". Procure por:
-   - "mercadolivre.com/sec/..." (Dê prioridade absoluta se estiver em um modal/campo de link).
-   - "amzn.to/..."
-   - "shope.ee/..."
-   - "magazineluiza.com.br/..."
-3. SE ENCONTRAR UM LINK CURTO (/sec/, amzn.to, etc): Use-o como o link oficial. Ele tem prioridade TOTAL sobre links longos ou de texto colado.
+🔴 REGRA CRÍTICA DE RETORNO (OBRIGATÓRIO):
+Você NÃO deve falar nada. Você NÃO deve usar blocos de código (\`\`\`json).
+Você deve retornar APENAS um ARRAY JSON cru. Nada antes, nada depois.
 
-⚠️ ATENÇÃO CRÍTICA - DETECÇÃO DE CUPONS:
-1. Analise a imagem e texto em busca de códigos promocionais ("CUPOM", "CÓDIGO", "USE:", "CODE:").
-2. Se encontrar, é OBRIGATÓRIO incluir na copy acima do link.
+O formato do JSON deve ser estritamente este:
+[
+  {
+    "originalLink": "O link do produto (priorize o link encontrado na imagem/print se houver)",
+    "text": "A copy completa formatada para WhatsApp com emojis, quebras de linha e negrito (*)",
+    "category": "Uma destas opções: TECH, HOME, BEAUTY, FASHION, FOOD, VIRAL, OTHER",
+    "productImageUrl": "Link público de uma imagem do produto em alta qualidade (fundo branco preferencialmente)"
+  }
+]
 
-🧱 ESTRUTURA OBRIGATÓRIA DA COPY (Siga este exemplo exato):
+DIRETRIZES DE CRIAÇÃO DA COPY (CAMPO "text"):
 
-🔥 [TÍTULO SUTIL E CRIATIVO SOBRE O TEMA COM EMOJI]
+1. ESTRUTURA:
+   🔥 [TÍTULO CURTO E IMPACTANTE]
+   
+   [Nome do Produto]
+   
+   💰 De ~[Preço Alto]~ por [Preço Oferta] ([X]% OFF)
+   (Use til ~ para riscar o preço antigo)
+   
+   💳 [Info de Parcelamento se houver]
+   
+   🎟️ Cupom: [CÓDIGO] (Se encontrar na imagem)
+   
+   🔗 Link: [LINK]
+   
+   ⚠️ _Oferta por tempo limitado._
 
-[Nome Comercial do Produto]
+2. GATILHOS MENTAIS:
+   - Use escassez e urgência.
+   - Use emojis adequados ao nicho (ex: 📱 para Tech, 💄 para Beleza).
+   - Não coloque "Produto:" ou "Preço:" antes dos valores, seja direto.
 
-💰 De ~[Preço_Antigo]~ por [Preço_Atual] ([X]% OFF)
-(Use til ~ para riscar o preço antigo. Se não houver preço antigo, coloque apenas o valor atual).
+3. DETECÇÃO DE DADOS:
+   - Se a imagem for um print do Mercado Livre/Amazon/Shopee, extraia o preço e o link da imagem via OCR.
+   - O link encontrado na imagem tem prioridade sobre o link de texto.
 
-💳 [Parcelamento]
-(Exiba apenas se houver no print, ex: 6x R$ 17,50 sem juros).
-
-🔗 Link: [LINK_DETECTADO_NA_IMAGEM]
-
-_Atenção: preço pode variar conforme estoque e disponibilidade._
-(Use underscores _ para o itálico).
-
-REGRAS GERAIS:
-- Não use rótulos como "Título:" ou "Produto:". Siga o espaçamento do exemplo.
-- Use português do Brasil persuasivo e natural.
-- Identifique o produto com precisão através do OCR da imagem.
+Responda APENAS com o JSON cru.
 `;
 
 const detectPlatform = (link: string): GeneratedCopy['platform'] => {
@@ -70,12 +77,9 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
 
   const promptText = `
   INPUTS DO USUÁRIO:
-  LINKS DE TEXTO:
-  ${links.map((link, i) => `${i + 1}. ${link}`).join('\n')}
+  ${links.length > 0 ? `LINKS DE TEXTO:\n${links.map((link, i) => `${i + 1}. ${link}`).join('\n')}` : 'Nenhum link colado, observe apenas a imagem.'}
 
-  INSTRUÇÃO:
-  Analise a imagem para extrair o Nome do Produto, Preço (De/Por), Parcelamento e o Link do Produto (especialmente links /sec/).
-  Gere a copy seguindo EXATAMENTE o modelo de estrutura fornecido no System Instruction.
+  Gere a copy seguindo EXATAMENTE o modelo de estrutura fornecido.
   `;
 
   const parts: any[] = [{ text: promptText }];
@@ -96,23 +100,17 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
       model: 'gemini-1.5-flash',
       contents: { parts: parts },
       config: {
-        systemInstruction: SYSTEM_INSTRUCTION + "\n\nCRITICAL: Return a JSON array. Each object must have 'originalLink', 'text', 'category'.",
+        systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
           items: {
             type: Type.OBJECT,
             properties: {
-              originalLink: {
-                type: Type.STRING
-              },
-              category: {
-                type: Type.STRING,
-                enum: ['TECH', 'HOME', 'BEAUTY', 'FASHION', 'FOOD', 'VIRAL', 'OTHER']
-              },
-              text: {
-                type: Type.STRING
-              }
+              originalLink: { type: Type.STRING },
+              category: { type: Type.STRING },
+              text: { type: Type.STRING },
+              productImageUrl: { type: Type.STRING }
             },
             required: ["originalLink", "text", "category"]
           }
@@ -121,6 +119,7 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
     });
 
     let cleanJson = response.text || "[]";
+    // Extra cleaning just in case the model ignores the "no blocks" instruction
     cleanJson = cleanJson.replace(/```json/g, '').replace(/```/g, '').trim();
 
     let output = [];
@@ -128,13 +127,13 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
       output = JSON.parse(cleanJson);
     } catch (e) {
       console.error("JSON Parse Error:", cleanJson);
-      throw new Error("Falha ao processar resposta da IA.");
+      throw new Error("Falha ao organizar resposta da IA.");
     }
 
     if (!Array.isArray(output) || output.length === 0) {
       output = [{
-        originalLink: links[0] || "No link",
-        text: "IA não conseguiu estruturar a copy automaticamente. Certifique-se de que o print mostra o nome e preço do produto claramente.",
+        originalLink: links[0] || "",
+        text: "IA analisou mas não gerou o formato JSON esperado. Tente novamente.",
         category: "OTHER"
       }];
     }
@@ -154,6 +153,7 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
         category: item.category,
         platform: detectPlatform(item.originalLink || links[index] || ""),
         imageUrl: assignedImage,
+        productImageUrl: item.productImageUrl,
         timestamp: Date.now(),
         isError: false
       };
@@ -161,11 +161,10 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
 
   } catch (error) {
     console.error("Gemini Generation Error:", error);
-    // Return a visible error card instead of an empty list
     return [{
       id: `err-${Date.now()}`,
       originalLink: links[0] || "",
-      text: "Lamento, não consegui processar esse pedido agora. Verifique sua conexão ou tente enviar um print mais nítido.",
+      text: "Lamento, houve um erro técnico na geração. Verifique sua chave de API e tente novamente.",
       category: 'OTHER',
       platform: detectPlatform(links[0] || ""),
       timestamp: Date.now(),
