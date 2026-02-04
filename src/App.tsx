@@ -292,6 +292,7 @@ const AppContent: React.FC = () => {
         </nav>
 
         <div className="flex items-center gap-3">
+          <span className="text-[10px] font-mono text-slate-300">v2.1</span>
           <div className="flex flex-col items-end hidden md:flex">
             <span className="text-[11px] font-bold text-slate-900 leading-none">{user?.user_metadata?.full_name || user?.email?.split('@')[0]}</span>
             <span className="text-[9px] font-medium text-slate-400 uppercase tracking-tighter">Premium User</span>

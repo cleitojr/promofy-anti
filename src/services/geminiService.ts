@@ -75,7 +75,7 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
     throw new Error("API Key is missing.");
   }
 
-  console.log("Starting Gemini Generation with SDK v1 (Deepmind SDK)");
+  console.log("v2.1 - Starting Gemini Generation with SDK v1 (Deepmind SDK)");
 
   const ai = createGoogleGenerativeAI({ apiKey });
 
