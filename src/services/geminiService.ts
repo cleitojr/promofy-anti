@@ -68,11 +68,15 @@ const getMimeType = (base64String: string): string => {
 };
 
 export const generateAffiliateText = async (links: string[], images: string[] = []): Promise<GeneratedCopy[]> => {
-  if (!process.env.API_KEY && !process.env.GEMINI_API_KEY) {
+  const apiKey = (process.env.API_KEY || process.env.GEMINI_API_KEY || "").trim();
+
+  if (!apiKey) {
+    console.error("Gemini API Key is missing in environment variables.");
     throw new Error("API Key is missing.");
   }
 
-  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || "";
+  console.log("Starting Gemini Generation with:", { linksCount: links.length, imagesCount: images.length });
+
   const ai = new GoogleGenAI({ apiKey });
 
   const promptText = `
@@ -84,23 +88,31 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
 
   const parts: any[] = [{ text: promptText }];
 
-  images.forEach((base64String) => {
-    const mimeType = getMimeType(base64String);
-    const base64Data = base64String.split(',')[1] || base64String;
-    parts.push({
-      inlineData: {
-        mimeType: mimeType,
-        data: base64Data
-      }
-    });
+  images.forEach((base64String, idx) => {
+    try {
+      const mimeType = getMimeType(base64String);
+      const base64Data = base64String.split(',')[1] || base64String;
+
+      console.log(`Processing image ${idx}:`, { mimeType, dataLength: base64Data.length });
+
+      parts.push({
+        inlineData: {
+          mimeType: mimeType,
+          data: base64Data
+        }
+      });
+    } catch (err) {
+      console.error(`Error processing image ${idx}:`, err);
+    }
   });
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
-      contents: { parts: parts },
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    // Use generateContent with standard SDK methods for better compatibility
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts }],
+      generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -115,10 +127,14 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
             required: ["originalLink", "text", "category"]
           }
         }
-      }
+      },
+      systemInstruction: SYSTEM_INSTRUCTION
     });
 
-    let cleanJson = response.text || "[]";
+    const response = await result.response;
+    let cleanJson = response.text() || "[]";
+    console.log("Raw AI Response:", cleanJson);
+
     // Extra cleaning just in case the model ignores the "no blocks" instruction
     cleanJson = cleanJson.replace(/```json/g, '').replace(/```/g, '').trim();
 
@@ -159,12 +175,12 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
       };
     });
 
-  } catch (error) {
-    console.error("Gemini Generation Error:", error);
+  } catch (error: any) {
+    console.error("Gemini Generation Error Details:", error);
     return [{
       id: `err-${Date.now()}`,
       originalLink: links[0] || "",
-      text: "Lamento, houve um erro técnico na geração. Verifique sua chave de API e tente novamente.",
+      text: `Erro técnico: ${error.message || "Falha na geração"}. Verifique o console ou a chave da API.`,
       category: 'OTHER',
       platform: detectPlatform(links[0] || ""),
       timestamp: Date.now(),
