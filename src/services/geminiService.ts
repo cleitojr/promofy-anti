@@ -1,4 +1,4 @@
-import { createGoogleGenerativeAI, Type } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { GeneratedCopy } from "../types";
 
 const SYSTEM_INSTRUCTION = `
@@ -75,16 +75,16 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
     throw new Error("API Key is missing.");
   }
 
-  console.log("v2.1 - Starting Gemini Generation with SDK v1 (Deepmind SDK)");
+  console.log("v2.2 - Starting Gemini Generation with GoogleGenAI (@google/genai)");
 
-  const ai = createGoogleGenerativeAI({ apiKey });
+  // Correct initialization for @google/genai v1.x
+  const ai = new GoogleGenAI({ apiKey });
 
   const promptText = `
   INPUTS DO USUÁRIO:
   ${links.length > 0 ? `LINKS DE TEXTO:\n${links.map((link, i) => `${i + 1}. ${link}`).join('\n')}` : 'Nenhum link colado, observe apenas a imagem.'}
   `;
 
-  // Construction for @google/genai SDK
   const parts: any[] = [{ text: promptText }];
 
   images.forEach((base64String, idx) => {
@@ -104,9 +104,10 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
   });
 
   try {
+    // Current SDK uses ai.models.generateContent
     const response = await ai.models.generateContent({
       model: "gemini-1.5-flash",
-      contents: parts,
+      contents: [{ role: 'user', parts }],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
@@ -136,7 +137,7 @@ export const generateAffiliateText = async (links: string[], images: string[] = 
       output = JSON.parse(cleanJson);
     } catch (e) {
       console.error("JSON Parse Error:", cleanJson);
-      throw new Error("Fallha ao processar o JSON da IA.");
+      throw new Error("Falha ao processar o JSON da IA.");
     }
 
     if (!Array.isArray(output) || output.length === 0) {
